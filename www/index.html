@@ -48,20 +48,90 @@
         }
         
      }
+     
+     // draw greyscale 
      for(i=0;i<allImageData.length;i++){
         ctx.putImageData(allImageData[i],i*document.images[0].width, document.images[0].height)
      }
      
-     
-     
      // Sum of absolute differences time
+     // take small sample of one image and compare to all 
+     // possible locations on target image
+     // using sad, find smallest sad value out of all comparisons
+     // use the smallest ssad values index to create new image
      
+     // divide image section into grids 
+     // take smaller of dimensions to get slice size
      
-     
-     
+    var sampleImageDim = Math.min(document.images[0].width,document.images[0].height);
+    var origImageDim = Math.max(document.images[0].width,document.images[0].height);
+    
+    var results=[];
+    var min = 0;
+    var numSteps = 10;
+    for(var j=0;j<numSteps;j++){
+        results[j] = sumImageComparison(j,numSteps,sampleImageDim,origImageDim);
+        if(results[j] < min || j==1){
+            min = j;
+        }
+    }
+    
+    // now begin repiecing data since we know which slice is most like the target
+    var cutOffset = Math.floor((min/numSteps)*origImageDim);
+    var samplePiece = [];
+    var origPiece = [];
+    
+    var rowIndex = 0;
+    var colIndex = 0;
+    var result = 0;
+    var totalImageSize = sampleImageDim*sampleImageDim
+    
+    for(var k=0;k<totalImageSize;k++){
+        // want to get correct row/col here
+        
+        if(k%sampleImageDim==0){
+            rowIndex++;
+            colIndex=0;
+        }
 
+        sampleValue = allImageData[0].data[rowIndex*(sampleImageDim*4)+(colIndex*4)];
+        targetValue= allImageData[1].data[rowIndex*(sampleImageDim*4)+((colIndex+offset)*4)];
+        
+
+           
 	}
-	
+    
+    var sumImageComparison = function(index, numSteps, sampleImageDim,origImageDim){
+    
+        var sampleValue= 0;
+        var targetValue = 0;
+        
+        var rowIndex = 0;
+        var colIndex = 0;
+        var result = 0;
+        var totalImageSize = sampleImageDim*sampleImageDim
+        var offset = Math.floor((index/numSteps)*origImageDim);
+        
+        for(var k=0;k<totalImageSize;k++){
+            // want to get correct row/col here
+            
+            if(k%sampleImageDim==0){
+                rowIndex++;
+                colIndex=0;
+            }
+
+            sampleValue = allImageData[0].data[rowIndex*(sampleImageDim*4)+(colIndex*4)];
+            targetValue= allImageData[1].data[rowIndex*(sampleImageDim*4)+((colIndex+offset)*4)];
+            
+            result += Math.abs(sampleValue - targetValue);
+            colIndex++; 
+        }
+        console.log('result ' + result);
+        
+        
+        
+        return result;
+    } 
 /*
 	function onDeviceReady()
 	{
