@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  <title></title>
+
+	<meta charset="utf-8">
+    <script type="text/javascript" src="js/sylvester.src.js"></script>
+    <script type="text/javascript">
+    
+    var theCanvas;
+    var ctx;
+    var allImageData = [];
+	function onBodyLoad()
+	{		
+		//document.addEventListener("deviceready", onDeviceReady, false);
+      
+     // ASSUMING ALL IMAGES ARE OF SAME SIZE
+     
+     // draw images 
+     theCanvas = document.getElementById('theCanvas');
+     ctx = theCanvas.getContext('2d');
+     theCanvas.width = document.images.length * document.images[0].width;
+     theCanvas.height = document.images.length * document.images[0].height;
+     for(i=0;i<document.images.length;i++){
+        ctx.drawImage(document.images[i],i*document.images[0].width,0);
+        
+        // get image data
+        allImageData.push(ctx.getImageData(i*document.images[0].width,0,document.images[0].width, document.images[0].height));
+     }
+     
+     // convert to greyscale to make things easier first
+     // r*.3 g*.59 b*.11
+     for(var j=0;j<allImageData.length;j++){
+        for(var k=0;k<allImageData[j].data.length;k++){
+            if(k>=4){
+                if(k%4==0){
+                    allImageData[j].data[k] *= 0.3;
+                }else if((k-1)%4==0){
+                    allImageData[j].data[k] *= 0.59;
+                }else if((k-2)%4==0){
+                    allImageData[j].data[k] *= 0.11;
+                    var sum = allImageData[j].data[k-2] + allImageData[j].data[k-1] + allImageData[j].data[k];
+                    allImageData[j].data[k-2]=sum;
+                    allImageData[j].data[k-1]=sum;
+                    allImageData[j].data[k]=sum;
+                }
+            }
+        }
+        
+     }
+     for(i=0;i<allImageData.length;i++){
+        ctx.putImageData(allImageData[i],i*document.images[0].width, document.images[0].height)
+     }
+     
+     
+     
+     // Sum of absolute differences time
+     
+     
+     
+     
+
+	}
+	
+/*
+	function onDeviceReady()
+	{
+
+	}
+   
+*/
+
+     
+    </script>
+  </head>
+  <body onload="onBodyLoad()">      
+    <canvas id="theCanvas">
+        
+    </canvas>
+    
+    <img id="img1" src="img/photo1.JPG" style="display:none" />
+    <img id="img2" src="img/photo2.JPG" style="display:none" />
+  </body>
+</html>
