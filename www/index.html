@@ -10,6 +10,7 @@
     var theCanvas;
     var ctx;
     var allImageData = [];
+    var POSITIVE_INFINITY = 1.7976931348623157E+10308;
 	function onBodyLoad()
 	{		
 		//document.addEventListener("deviceready", onDeviceReady, false);
@@ -63,20 +64,30 @@
      // divide image section into grids 
      // take smaller of dimensions to get slice size
      
-    var sampleImageDim = Math.min(document.images[0].width,document.images[0].height);
-    var origImageDim = Math.max(document.images[0].width,document.images[0].height);
+    //var sampleImageDim = Math.min(document.images[0].width,document.images[0].height);
+    //var origImageDim = Math.max(document.images[0].width,document.images[0].height);
     
     var results=[];
-    var min = 0;
     var numSteps = 10;
+    var linearHorizStepSize = Math.floor(document.images[0].width/numSteps);
+    var linearVertStepSize = document.images[0].height;
+    var sampleImgSlice = sliceImage(allImageData[0],0,0,linearHorizStepSize,linearVertStepSize);
+    var targetImg = allImageData[1];
+    //ctx.putImageData(sampleImgSlice,0,0);
+    
+    var min = POSITIVE_INFINITY;
     for(var j=0;j<numSteps;j++){
-        results[j] = sumImageComparison(j,numSteps,sampleImageDim,origImageDim);
+        results[j] = linearHorizSADImageComparison(j,numSteps,sampleImgSlice,targetImg,min);
         if(results[j] < min || j==1){
             min = j;
         }
     }
     
+    
+    
+    
     // now begin repiecing data since we know which slice is most like the target
+    /*
     var cutOffset = Math.floor((min/numSteps)*origImageDim);
     var samplePiece = [];
     var origPiece = [];
@@ -96,42 +107,51 @@
 
         sampleValue = allImageData[0].data[rowIndex*(sampleImageDim*4)+(colIndex*4)];
         targetValue= allImageData[1].data[rowIndex*(sampleImageDim*4)+((colIndex+offset)*4)];
-        
+    */
 
            
 	}
     
-    var sumImageComparison = function(index, numSteps, sampleImageDim,origImageDim){
+    var linearHorizSADImageComparison = function(index, numSteps, sampleImg, targetImg,currentMin){
     
-        var sampleValue= 0;
-        var targetValue = 0;
+        var targetOffsetLeft = Math.floor((index/numSteps)*targetImg.width);
+        var tagetOffsetTop = 0;
+        var targetImgWidth = targetImg.width;
+        var sampleImgWidth = sampleImg.width;
+        var sampleImgHeight = sampleImg.height;
         
-        var rowIndex = 0;
-        var colIndex = 0;
         var result = 0;
-        var totalImageSize = sampleImageDim*sampleImageDim
-        var offset = Math.floor((index/numSteps)*origImageDim);
-        
-        for(var k=0;k<totalImageSize;k++){
-            // want to get correct row/col here
-            
-            if(k%sampleImageDim==0){
-                rowIndex++;
-                colIndex=0;
-            }
+        for(var i=targetOffsetLeft,x=0;x<sampleImgWidth;i++,x++){
+            for(var j=tagetOffsetTop,y=0;y<sampleImgHeight;j++,y++){
+            var index = (x + y* sampleImgWidth)*4;
+                result += Math.abs(sampleImg.data[index] - targetImg.data[((i+j*targetImgWidth)*4)]);
+                result += Math.abs(sampleImg.data[index+1] - targetImg.data[((i+j*targetImgWidth)*4)+1]);
+                result += Math.abs(sampleImg.data[index+2] - targetImg.data[((i+j*targetImgWidth)*4)+2]);
+                result += Math.abs(sampleImg.data[index+3] - targetImg.data[((i+j*targetImgWidth)*4)+3]);
 
-            sampleValue = allImageData[0].data[rowIndex*(sampleImageDim*4)+(colIndex*4)];
-            targetValue= allImageData[1].data[rowIndex*(sampleImageDim*4)+((colIndex+offset)*4)];
-            
-            result += Math.abs(sampleValue - targetValue);
-            colIndex++; 
-        }
+            }
+            if(result>currentMin){
+                //break;
+            }
+        }        
+        
         console.log('result ' + result);
-        
-        
-        
         return result;
     } 
+    
+    var sliceImage = function(image, top, left, sliceWidth, sliceHeight){
+        var slicedImage = ctx.createImageData(sliceWidth, sliceHeight);
+        for(var i=left,x=0;x<sliceWidth;i++,x++){
+            for(var j=top,y=0;y<sliceHeight;j++,y++){
+            var index = (x + y* sliceWidth)*4;
+                slicedImage.data[index] = image.data[((i+j*image.width)*4)];
+                slicedImage.data[index+1] = image.data[((i+j*image.width)*4)+1];
+                slicedImage.data[index+2] = image.data[((i+j*image.width)*4)+2];
+                slicedImage.data[index+3] = image.data[((i+j*image.width)*4)+3];
+            }
+        }
+        return slicedImage;
+    }
 /*
 	function onDeviceReady()
 	{
