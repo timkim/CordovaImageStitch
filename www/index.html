@@ -30,67 +30,91 @@
      
      // convert to greyscale to make things easier first
      // r*.3 g*.59 b*.11
+     /*
+     var edgeDataOne = ctx.createImageData(document.images[0].width, document.images[0].height);
+     var edgeDataTwo = ctx.createImageData(document.images[1].width, document.images[1].height);
+     var allEdgeData = [edgeDataOne, edgeDataTwo];
      for(var j=0;j<allImageData.length;j++){
-        for(var k=0;k<allImageData[j].data.length;k++){
-            // screw the first 4 pixels
-            if(k>=4){
-                if(k%4==0){
-                    allImageData[j].data[k] *= 0.3;
-                }else if((k-1)%4==0){
-                    allImageData[j].data[k] *= 0.59;
-                }else if((k-2)%4==0){
-                    allImageData[j].data[k] *= 0.11;
-                    var sum = allImageData[j].data[k-2] + allImageData[j].data[k-1] + allImageData[j].data[k];
-                    allImageData[j].data[k-2]=sum;
-                    allImageData[j].data[k-1]=sum;
-                    allImageData[j].data[k]=sum;
-                }
-            }
+        // shamlessly pilfered from http://dev.w3.org/html5/2dcontext/
+        var w = allImageData[j].width, h = allImageData[j].height;
+        for (var y = 1; y < h-1; y += 1) {
+               for (var x = 1; x < w-1; x += 1) {
+                 for (var c = 0; c < 3; c += 1) {
+                   var i = (y*w + x)*4 + c;
+                   allEdgeData[j].data[i] = 127 + -allImageData[j].data[i - w*4 - 4] -   allImageData[j].data[i - w*4] - allImageData[j].data[i - w*4 + 4] +
+                                         -allImageData[j].data[i - 4]       + 8*allImageData[j].data[i]       - allImageData[j].data[i + 4] +
+                                         -allImageData[j].data[i + w*4 - 4] -   allImageData[j].data[i + w*4] - allImageData[j].data[i + w*4 + 4];
+                 }
+                 allEdgeData[j].data[(y*w + x)*4 + 3] = 255; // alpha
+               }
         }
-        
      }
      
      // draw greyscale 
      for(i=0;i<allImageData.length;i++){
-        ctx.putImageData(allImageData[i],i*document.images[0].width, document.images[0].height)
+        ctx.putImageData(allEdgeData[i],i*document.images[0].width, document.images[0].height)
      }
-     
-     // Sum of absolute differences time
-     // take small sample of one image and compare to all 
-     // possible locations on target image
-     // using sad, find smallest sad value out of all comparisons
-     // use the smallest ssad values index to create new image
-    
-    var results=[];
-    var numSteps = 90;
-    var linearHorizStepSize = Math.floor(document.images[0].width/numSteps);
-    var linearVertStepSize = document.images[0].height;
-    var sampleImgSlice = sliceImage(allImageData[0],0,0,linearHorizStepSize,linearVertStepSize);
-    var targetImg = allImageData[1];
-    //ctx.putImageData(sampleImgSlice,0,0);
-    
-    var min = 0;
-    var runningMin = POSITIVE_INFINITY;
-    for(var j=0;j<numSteps;j++){
-        results[j] = linearHorizSADImageComparison(j,numSteps,sampleImgSlice,targetImg,runningMin);
-        if(results[j] < runningMin || j==1){
-            min = j;
-            runningMin = results[j];
-        }
-    }
-    
+     */
+ 
     // take min slice number to rest of image width and paste that 
     // onto location of target to get resulting image
-    var widthOffset = linearHorizStepSize*min;
-    var remainingWidth = allImageData[0].width-widthOffset;
-    var resultTargetImg = sliceImage(allImageData[1],0,0,widthOffset,linearVertStepSize);
-    var resultSampleImg = sliceImage(allImageData[0],0,widthOffset,remainingWidth,linearVertStepSize);
+    var linearResults = compareLinearSlices(allImageData[0], allImageData[1], 20);
     
-    ctx.putImageData(resultTargetImg,0,resultTargetImg.height*2);
-    ctx.putImageData(allImageData[0],widthOffset,resultTargetImg.height*2);
+    if(linearResults.imageOneWidthOffset<linearResults.imageTwoWidthOffset){
+        console.log('imageOneWidthOffset larger');
+        ctx.putImageData(allImageData[0],linearResults.center,allImageData[0].height);
+        ctx.putImageData(allImageData[1],linearResults.center-linearResults.resultantOffset,allImageData[0].height);     
+    }else{
+        console.log('imageTWoWidthOffset larger');
+        
+        ctx.putImageData(allImageData[1],linearResults.center,allImageData[0].height);
+        ctx.putImageData(allImageData[0],linearResults.center-linearResults.resultantOffset,allImageData[0].height);
+    }
+
 	}
     
-    var linearHorizSADImageComparison = function(index, numSteps, sampleImg, targetImg, runningMin){
+    var compareLinearSlices = function(imageOne, imageTwo, steps){
+         // Sum of absolute differences time
+         // take small sample of one image and compare to all 
+         // possible locations on target image
+         // using sad, find smallest sad value out of all comparisons
+         // use the smallest ssad values index to create new image
+        
+        // iterate over many small samples to figure out which one is best and use stitching based on that
+        var results=[];
+        var numSteps = steps;
+        var linearHorizStepSize = Math.floor(imageOne.width/numSteps);
+        var linearVertStepSize = imageOne.height;
+        
+        var min = {};
+        var runningMin = POSITIVE_INFINITY;
+        for(var i=0;i<numSteps;i++){
+            var sampleImgSlice = sliceImage(imageOne,0,i*linearHorizStepSize,linearHorizStepSize,linearVertStepSize);
+            var targetImg = imageTwo;
+
+            
+            for(var j=0;j<numSteps;j++){    
+                results[i+j*numSteps] = linearHorizSADImageComparison(j,numSteps,sampleImgSlice,targetImg);
+
+                if(results[i+j*numSteps] < runningMin || (j==0 && i==0)){
+                    min.i = i;
+                    min.j = j;
+                    runningMin = results[i+j*numSteps];
+                }
+            }
+        }
+
+        var imageOneWidthOffset = (linearHorizStepSize*min.i);
+        var imageTwoWidthOffset = (linearHorizStepSize*min.j);
+        var center = imageOne.width/2;
+        var resultantOffset = Math.abs(imageOneWidthOffset-imageTwoWidthOffset);
+        ctx.strokeRect(imageOneWidthOffset,0,linearHorizStepSize,linearVertStepSize); 
+        ctx.strokeRect(imageTwoWidthOffset+imageOne.width,0,linearHorizStepSize,linearVertStepSize);
+        
+        return {resultantOffset:resultantOffset, center: center, imageOneWidthOffset: imageOneWidthOffset, imageTwoWidthOffset:imageTwoWidthOffset};
+    }
+    
+    var linearHorizSADImageComparison = function(index, numSteps, sampleImg, targetImg){
     
         var targetOffsetLeft = Math.floor((index/numSteps)*targetImg.width);
         var tagetOffsetTop = 0;
@@ -100,9 +124,6 @@
         
         var result = 0;
         for(var i=targetOffsetLeft,x=0;x<sampleImgWidth;i++,x++){
-            if(result>runningMin){
-                break;
-            }
             for(var j=tagetOffsetTop,y=0;y<sampleImgHeight;j++,y++){
             var index = (x + y* sampleImgWidth)*4;
                 result += Math.abs(sampleImg.data[index] - targetImg.data[((i+j*targetImgWidth)*4)]);
@@ -144,7 +165,7 @@
         
     </canvas>
     
-    <img id="img1" src="img/photo1.JPG" style="display:none" />
-    <img id="img2" src="img/photo2.JPG" style="display:none" />
+    <img id="img1" src="img/9.JPG" style="display:none" />
+    <img id="img2" src="img/10.JPG" style="display:none" />
   </body>
 </html>
