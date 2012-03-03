@@ -4,7 +4,6 @@
   <title></title>
 
 	<meta charset="utf-8">
-    <script type="text/javascript" src="js/sylvester.src.js"></script>
     <script type="text/javascript">
     
     var theCanvas;
@@ -21,7 +20,7 @@
      theCanvas = document.getElementById('theCanvas');
      ctx = theCanvas.getContext('2d');
      theCanvas.width = document.images.length * document.images[0].width;
-     theCanvas.height = document.images.length * document.images[0].height;
+     theCanvas.height = 3 * document.images[0].height;
      for(i=0;i<document.images.length;i++){
         ctx.drawImage(document.images[i],i*document.images[0].width,0);
         
@@ -33,6 +32,7 @@
      // r*.3 g*.59 b*.11
      for(var j=0;j<allImageData.length;j++){
         for(var k=0;k<allImageData[j].data.length;k++){
+            // screw the first 4 pixels
             if(k>=4){
                 if(k%4==0){
                     allImageData[j].data[k] *= 0.3;
@@ -60,59 +60,37 @@
      // possible locations on target image
      // using sad, find smallest sad value out of all comparisons
      // use the smallest ssad values index to create new image
-     
-     // divide image section into grids 
-     // take smaller of dimensions to get slice size
-     
-    //var sampleImageDim = Math.min(document.images[0].width,document.images[0].height);
-    //var origImageDim = Math.max(document.images[0].width,document.images[0].height);
     
     var results=[];
-    var numSteps = 10;
+    var numSteps = 90;
     var linearHorizStepSize = Math.floor(document.images[0].width/numSteps);
     var linearVertStepSize = document.images[0].height;
     var sampleImgSlice = sliceImage(allImageData[0],0,0,linearHorizStepSize,linearVertStepSize);
     var targetImg = allImageData[1];
     //ctx.putImageData(sampleImgSlice,0,0);
     
-    var min = POSITIVE_INFINITY;
+    var min = 0;
+    var runningMin = POSITIVE_INFINITY;
     for(var j=0;j<numSteps;j++){
-        results[j] = linearHorizSADImageComparison(j,numSteps,sampleImgSlice,targetImg,min);
-        if(results[j] < min || j==1){
+        results[j] = linearHorizSADImageComparison(j,numSteps,sampleImgSlice,targetImg,runningMin);
+        if(results[j] < runningMin || j==1){
             min = j;
+            runningMin = results[j];
         }
     }
     
+    // take min slice number to rest of image width and paste that 
+    // onto location of target to get resulting image
+    var widthOffset = linearHorizStepSize*min;
+    var remainingWidth = allImageData[0].width-widthOffset;
+    var resultTargetImg = sliceImage(allImageData[1],0,0,widthOffset,linearVertStepSize);
+    var resultSampleImg = sliceImage(allImageData[0],0,widthOffset,remainingWidth,linearVertStepSize);
     
-    
-    
-    // now begin repiecing data since we know which slice is most like the target
-    /*
-    var cutOffset = Math.floor((min/numSteps)*origImageDim);
-    var samplePiece = [];
-    var origPiece = [];
-    
-    var rowIndex = 0;
-    var colIndex = 0;
-    var result = 0;
-    var totalImageSize = sampleImageDim*sampleImageDim
-    
-    for(var k=0;k<totalImageSize;k++){
-        // want to get correct row/col here
-        
-        if(k%sampleImageDim==0){
-            rowIndex++;
-            colIndex=0;
-        }
-
-        sampleValue = allImageData[0].data[rowIndex*(sampleImageDim*4)+(colIndex*4)];
-        targetValue= allImageData[1].data[rowIndex*(sampleImageDim*4)+((colIndex+offset)*4)];
-    */
-
-           
+    ctx.putImageData(resultTargetImg,0,resultTargetImg.height*2);
+    ctx.putImageData(allImageData[0],widthOffset,resultTargetImg.height*2);
 	}
     
-    var linearHorizSADImageComparison = function(index, numSteps, sampleImg, targetImg,currentMin){
+    var linearHorizSADImageComparison = function(index, numSteps, sampleImg, targetImg, runningMin){
     
         var targetOffsetLeft = Math.floor((index/numSteps)*targetImg.width);
         var tagetOffsetTop = 0;
@@ -122,20 +100,18 @@
         
         var result = 0;
         for(var i=targetOffsetLeft,x=0;x<sampleImgWidth;i++,x++){
+            if(result>runningMin){
+                break;
+            }
             for(var j=tagetOffsetTop,y=0;y<sampleImgHeight;j++,y++){
             var index = (x + y* sampleImgWidth)*4;
                 result += Math.abs(sampleImg.data[index] - targetImg.data[((i+j*targetImgWidth)*4)]);
                 result += Math.abs(sampleImg.data[index+1] - targetImg.data[((i+j*targetImgWidth)*4)+1]);
                 result += Math.abs(sampleImg.data[index+2] - targetImg.data[((i+j*targetImgWidth)*4)+2]);
                 result += Math.abs(sampleImg.data[index+3] - targetImg.data[((i+j*targetImgWidth)*4)+3]);
-
-            }
-            if(result>currentMin){
-                //break;
             }
         }        
-        
-        console.log('result ' + result);
+    
         return result;
     } 
     
